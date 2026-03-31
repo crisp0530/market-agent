@@ -91,3 +91,22 @@ class TestTradeSignalGenerator:
             character_type="普通票",
         )
         assert 0 <= result.score <= 100
+
+    def test_ignores_non_score_metadata_fields(self, signal_config):
+        gen = TradeSignalGenerator(signal_config)
+        result = gen.generate(
+            symbol="601868", name="中国能建", market="cn",
+            market_score=55,
+            stock_scores={
+                "trend": 50,
+                "momentum": 35,
+                "sentiment": 34.5,
+                "volatility": 0,
+                "flow": 56.4,
+                "rating": 2,
+                "available_dimensions": ["trend", "momentum", "sentiment", "volatility", "flow"],
+            },
+            character_type="普通票",
+        )
+        assert result.stock_score == pytest.approx(35.2, abs=0.1)
+        assert result.signal in {"大吉", "小吉", "平", "小凶", "大凶"}

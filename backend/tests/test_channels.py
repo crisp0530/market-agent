@@ -397,6 +397,8 @@ def _make_mock_langgraph_client(thread_id="test-thread-123", run_result=None):
             ]
         }
     mock_client.runs.wait = AsyncMock(return_value=run_result)
+    mock_client.runs.list = AsyncMock(return_value=[])
+    mock_client.runs.join = AsyncMock(return_value=run_result)
 
     return mock_client
 
@@ -852,6 +854,56 @@ class TestChannelManager:
             assert mock_client.runs.wait.call_count == 2
             for call in mock_client.runs.wait.call_args_list:
                 assert call[0][0] == "topic-thread-1"
+
+        _run(go())
+
+    def test_non_streaming_timeout_preserves_thread_and_notifies_user(self):
+        import app.channels.manager as manager_module
+        from app.channels.manager import ChannelManager, NON_STREAMING_TIMEOUT_MESSAGE
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(bus=bus, store=store)
+
+            store.set_thread_id("telegram", "chat1", "stuck-thread")
+
+            mock_client = _make_mock_langgraph_client(thread_id="stuck-thread")
+            timeout_seconds = 0.1
+            original_timeout = manager_module.NON_STREAMING_RUN_TIMEOUT_SECONDS
+            manager_module.NON_STREAMING_RUN_TIMEOUT_SECONDS = timeout_seconds
+
+            async def slow_wait(*args, **kwargs):
+                await asyncio.sleep(timeout_seconds + 1)
+                return {"messages": []}
+
+            mock_client.runs.wait = AsyncMock(side_effect=slow_wait)
+            manager._client = mock_client
+
+            outbound_received = []
+
+            async def capture_outbound(msg):
+                outbound_received.append(msg)
+
+            bus.subscribe_outbound(capture_outbound)
+            await manager.start()
+
+            inbound = InboundMessage(
+                channel_name="telegram",
+                chat_id="chat1",
+                user_id="user1",
+                text="601868 分析一下这个股票",
+            )
+            await bus.publish_inbound(inbound)
+            try:
+                await _wait_for(lambda: len(outbound_received) >= 1, timeout=2.0)
+                await manager.stop()
+            finally:
+                manager_module.NON_STREAMING_RUN_TIMEOUT_SECONDS = original_timeout
+
+            assert len(outbound_received) == 1
+            assert outbound_received[0].text == NON_STREAMING_TIMEOUT_MESSAGE
+            assert store.get_thread_id("telegram", "chat1") == "stuck-thread"
 
         _run(go())
 

@@ -23,6 +23,7 @@ config.yaml
 
 # Langgraph
 .langgraph_api
+.langgraph_api.bak-*
 
 # Claude Code settings
 .claude/settings.local.json

@@ -25,6 +25,17 @@ DEFAULT_RUN_CONTEXT: dict[str, Any] = {
     "subagent_enabled": False,
 }
 STREAM_UPDATE_MIN_INTERVAL_SECONDS = 0.35
+NON_STREAMING_RUN_TIMEOUT_SECONDS = 90
+NON_STREAMING_TIMEOUT_MESSAGE = (
+    "This request is taking longer than expected. I'm still working on it "
+    "and will send the result here when it's ready. Send /new if you want "
+    "to start a fresh chat."
+)
+ACTIVE_RUN_MESSAGE = (
+    "Your previous request is still running. Please wait for it to finish, "
+    "or send /new to start a fresh chat."
+)
+BACKGROUND_RUN_JOIN_TIMEOUT_SECONDS = 900
 
 CHANNEL_CAPABILITIES = {
     "feishu": {"supports_streaming": True},
@@ -346,6 +357,7 @@ class ChannelManager:
         self._semaphore: asyncio.Semaphore | None = None
         self._running = False
         self._task: asyncio.Task | None = None
+        self._background_tasks: set[asyncio.Task] = set()
 
     @staticmethod
     def _channel_supports_streaming(channel_name: str) -> bool:
@@ -462,6 +474,114 @@ class ChannelManager:
 
     # -- chat handling -----------------------------------------------------
 
+    async def _list_active_runs(self, client, thread_id: str) -> list[dict[str, Any]]:
+        """Return active runs (running first, then pending) for a thread."""
+        running = await client.runs.list(thread_id, status="running")
+        pending = await client.runs.list(thread_id, status="pending")
+        return [*running, *pending]
+
+    async def _publish_result(
+        self,
+        msg: InboundMessage,
+        *,
+        thread_id: str,
+        result: dict[str, Any] | list[Any],
+        log_prefix: str,
+    ) -> None:
+        response_text = _extract_response_text(result)
+        artifacts = _extract_artifacts(result)
+
+        logger.info(
+            "%s: thread_id=%s, response_len=%d, artifacts=%d",
+            log_prefix,
+            thread_id,
+            len(response_text) if response_text else 0,
+            len(artifacts),
+        )
+
+        response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts)
+
+        if not response_text:
+            if attachments:
+                response_text = _format_artifact_text([a.virtual_path for a in attachments])
+            else:
+                response_text = "(No response from agent)"
+
+        outbound = OutboundMessage(
+            channel_name=msg.channel_name,
+            chat_id=msg.chat_id,
+            thread_id=thread_id,
+            text=response_text,
+            artifacts=artifacts,
+            attachments=attachments,
+            thread_ts=msg.thread_ts,
+        )
+        logger.info("[Manager] publishing outbound message to bus: channel=%s, chat_id=%s", msg.channel_name, msg.chat_id)
+        await self.bus.publish_outbound(outbound)
+
+    def _track_background_task(self, task: asyncio.Task) -> None:
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        task.add_done_callback(self._log_task_error)
+
+    async def _wait_for_timed_out_run(
+        self,
+        client,
+        msg: InboundMessage,
+        *,
+        thread_id: str,
+        run_id: str,
+    ) -> None:
+        """Keep waiting for a timed-out run and publish the final result later."""
+        logger.info(
+            "[Manager] background wait started: channel=%s, chat_id=%s, thread_id=%s, run_id=%s",
+            msg.channel_name,
+            msg.chat_id,
+            thread_id,
+            run_id,
+        )
+        try:
+            result = await asyncio.wait_for(
+                client.runs.join(thread_id, run_id),
+                timeout=BACKGROUND_RUN_JOIN_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "[Manager] background wait timed out after %ss: channel=%s, chat_id=%s, thread_id=%s, run_id=%s",
+                BACKGROUND_RUN_JOIN_TIMEOUT_SECONDS,
+                msg.channel_name,
+                msg.chat_id,
+                thread_id,
+                run_id,
+            )
+            await self.bus.publish_outbound(
+                OutboundMessage(
+                    channel_name=msg.channel_name,
+                    chat_id=msg.chat_id,
+                    thread_id=thread_id,
+                    text="This request is still running longer than expected. You can wait, or send /new to start a fresh chat.",
+                    thread_ts=msg.thread_ts,
+                )
+            )
+            return
+        except Exception:
+            logger.exception(
+                "[Manager] background wait failed: channel=%s, chat_id=%s, thread_id=%s, run_id=%s",
+                msg.channel_name,
+                msg.chat_id,
+                thread_id,
+                run_id,
+            )
+            await self._send_error(msg, "An internal error occurred while waiting for the result. Please try /new.")
+            return
+
+        await self._publish_result(
+            msg,
+            thread_id=thread_id,
+            result=result,
+            log_prefix="[Manager] background agent response received",
+        )
+
     async def _create_thread(self, client, msg: InboundMessage) -> str:
         """Create a new thread on the LangGraph Server and store the mapping."""
         thread = await client.threads.create()
@@ -489,6 +609,26 @@ class ChannelManager:
         # No existing thread found — create a new one
         if thread_id is None:
             thread_id = await self._create_thread(client, msg)
+        else:
+            active_runs = await self._list_active_runs(client, thread_id)
+            if active_runs:
+                logger.info(
+                    "[Manager] active run already exists, refusing to enqueue duplicate: channel=%s, chat_id=%s, thread_id=%s, active_runs=%d",
+                    msg.channel_name,
+                    msg.chat_id,
+                    thread_id,
+                    len(active_runs),
+                )
+                await self.bus.publish_outbound(
+                    OutboundMessage(
+                        channel_name=msg.channel_name,
+                        chat_id=msg.chat_id,
+                        thread_id=thread_id,
+                        text=ACTIVE_RUN_MESSAGE,
+                        thread_ts=msg.thread_ts,
+                    )
+                )
+                return
 
         assistant_id, run_config, run_context = self._resolve_run_params(msg, thread_id)
         if extra_context:
@@ -505,43 +645,64 @@ class ChannelManager:
             return
 
         logger.info("[Manager] invoking runs.wait(thread_id=%s, text=%r)", thread_id, msg.text[:100])
-        result = await client.runs.wait(
-            thread_id,
-            assistant_id,
-            input={"messages": [{"role": "human", "content": msg.text}]},
-            config=run_config,
-            context=run_context,
-        )
+        created_run_id: str | None = None
 
-        response_text = _extract_response_text(result)
-        artifacts = _extract_artifacts(result)
-
-        logger.info(
-            "[Manager] agent response received: thread_id=%s, response_len=%d, artifacts=%d",
-            thread_id,
-            len(response_text) if response_text else 0,
-            len(artifacts),
-        )
-
-        response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts)
-
-        if not response_text:
-            if attachments:
-                response_text = _format_artifact_text([a.virtual_path for a in attachments])
+        def _capture_run_created(meta: Any) -> None:
+            nonlocal created_run_id
+            if isinstance(meta, Mapping):
+                value = meta.get("run_id")
             else:
-                response_text = "(No response from agent)"
+                value = getattr(meta, "run_id", None)
+            if isinstance(value, str) and value:
+                created_run_id = value
 
-        outbound = OutboundMessage(
-            channel_name=msg.channel_name,
-            chat_id=msg.chat_id,
+        try:
+            result = await asyncio.wait_for(
+                client.runs.wait(
+                    thread_id,
+                    assistant_id,
+                    input={"messages": [{"role": "human", "content": msg.text}]},
+                    config=run_config,
+                    context=run_context,
+                    on_run_created=_capture_run_created,
+                ),
+                timeout=NON_STREAMING_RUN_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "[Manager] runs.wait timed out after %ss: channel=%s, chat_id=%s, thread_id=%s",
+                NON_STREAMING_RUN_TIMEOUT_SECONDS,
+                msg.channel_name,
+                msg.chat_id,
+                thread_id,
+            )
+            if created_run_id:
+                task = asyncio.create_task(
+                    self._wait_for_timed_out_run(
+                        client,
+                        msg,
+                        thread_id=thread_id,
+                        run_id=created_run_id,
+                    )
+                )
+                self._track_background_task(task)
+            await self.bus.publish_outbound(
+                OutboundMessage(
+                    channel_name=msg.channel_name,
+                    chat_id=msg.chat_id,
+                    thread_id=thread_id,
+                    text=NON_STREAMING_TIMEOUT_MESSAGE,
+                    thread_ts=msg.thread_ts,
+                )
+            )
+            return
+
+        await self._publish_result(
+            msg,
             thread_id=thread_id,
-            text=response_text,
-            artifacts=artifacts,
-            attachments=attachments,
-            thread_ts=msg.thread_ts,
+            result=result,
+            log_prefix="[Manager] agent response received",
         )
-        logger.info("[Manager] publishing outbound message to bus: channel=%s, chat_id=%s", msg.channel_name, msg.chat_id)
-        await self.bus.publish_outbound(outbound)
 
     async def _handle_streaming_chat(
         self,

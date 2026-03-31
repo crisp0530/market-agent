@@ -17,6 +17,7 @@ class TradeSignalGenerator:
         (20, "小凶"),
         (0, "大凶"),
     ]
+    SCORE_KEYS = {"trend", "momentum", "sentiment", "volatility", "flow"}
 
     def __init__(self, config: dict):
         cfg = config.get("trade_signal", {})
@@ -38,7 +39,13 @@ class TradeSignalGenerator:
         character_type: str,
         risk_warnings: list[str] | None = None,
     ) -> TradeSignal:
-        valid_scores = {k: v for k, v in stock_scores.items() if v is not None}
+        # StockDiagnostor returns extra metadata fields like rating/available_dimensions.
+        # Only the numeric score dimensions should contribute to signal generation.
+        valid_scores = {
+            k: float(v)
+            for k, v in stock_scores.items()
+            if k in self.SCORE_KEYS and isinstance(v, (int, float)) and v is not None
+        }
         raw_stock = float(np.mean(list(valid_scores.values()))) if valid_scores else 50.0
 
         character_score = self._adjust_stock_score(valid_scores, character_type)
