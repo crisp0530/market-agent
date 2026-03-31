@@ -1,0 +1,71 @@
+# Portfolio configuration for Market Analyst
+
+holdings:
+  - symbol: PLTR
+    name: Palantir
+    avg_cost: 140
+    target_buy: 140
+    target_sell: null
+    position_pct: 10
+    notes: "建仓均价$140+，等跌回$140附近再补"
+
+  - symbol: META
+    name: Meta
+    avg_cost: 620
+    target_buy: 620
+    target_sell: null
+    notes: "观察中，目标$620以下，现价还没到"
+
+  - symbol: GOOGL
+    name: Google
+    avg_cost: null
+    target_buy: null
+    target_sell: null
+    notes: "看不到太好的机会，等大盘给机会"
+
+  - symbol: MSFT
+    name: Microsoft
+    avg_cost: 395
+    target_buy: null
+    target_sell: null
+    notes: "均价$395建仓，拿着就行，不需要追加"
+
+  - symbol: KC
+    name: Kingsoft Cloud
+    avg_cost: 11.75
+    target_buy: null
+    target_sell: null
+    notes: "持有观察"
+
+watchlist:
+  - symbol: NVDA
+    name: NVIDIA
+    target_buy: 170
+    target_sell: null
+    logic: "200日EMA支撑位，GTC大会催化剂"
+    position_plan: "$170以下第一批40%，$176不追"
+
+  - symbol: TSLA
+    name: Tesla
+    target_buy: 385
+    target_sell: null
+    logic: "SpaceX IPO催化剂，FSD/Optimus叙事"
+    position_plan: "$385以下第一批40%，$350-360留子弹第二批，$395+不追"
+
+  - symbol: AMD
+    name: AMD
+    target_buy: 185
+    target_sell: null
+    logic: "100日EMA区间，AI芯片受益但护城河比NVDA浅"
+    position_plan: "$185-190可小仓介入"
+
+  - symbol: MU
+    name: Micron
+    target_buy: null
+    target_sell: null
+    logic: "财报窗口有时间限制，最紧迫"
+    position_plan: "等财报后再决定"
+
+settings:
+  ema_periods: [20, 50, 100, 200]
+  proximity_threshold: 4

@@ -1,0 +1,14 @@
+model_provider = "openai"
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+personality = "pragmatic"
+
+[notice.model_migrations]
+"gpt-5.1-codex-max" = "gpt-5.2-codex"
+
+[mcp_servers.pencil]
+command = "c:\\Users\\admin\\.cursor\\extensions\\highagency.pencildev-0.6.36-universal\\out\\mcp-server-windows-x64.exe"
+args = [ "--app", "cursor" ]
+
+[windows]
+sandbox = "elevated"

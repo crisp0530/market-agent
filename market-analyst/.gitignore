@@ -1,0 +1,24 @@
+# Environment
+config/.env
+.venv/
+*.egg-info/
+
+# Cache & data
+data/cache/
+data/*.json
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Logs & screenshots
+logs/
+screenshots/
+
+# Web frontend
+web/node_modules/
+web/.next/
+
+# IDE
+.idea/
+.vscode/
+*.swp

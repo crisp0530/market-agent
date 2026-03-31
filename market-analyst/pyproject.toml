@@ -1,0 +1,42 @@
+[project]
+name = "market-analyst"
+version = "0.1.0"
+description = "Market analysis MCP server for DeerFlow"
+requires-python = ">=3.11"
+dependencies = [
+    "yfinance>=0.2.31,<1.0",
+    "akshare>=1.12.0",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "pyyaml>=6.0.1",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.2",
+    "pyarrow>=14.0",
+    "pydantic>=2.0",
+    "fastmcp>=0.1.0",
+    "tavily-python>=0.5.0",
+    "duckduckgo-search>=4.0",
+    "tvscreener>=0.1.0",
+]
+
+[project.optional-dependencies]
+ai = [
+    "google-genai>=1.0.0",
+    "anthropic>=0.25.0",
+    "openai>=1.0.0",
+]
+dashboard = [
+    "streamlit>=1.35.0",
+    "plotly>=5.20.0",
+]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.setuptools.packages.find]
+include = ["market_analyst*"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

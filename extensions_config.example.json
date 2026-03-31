@@ -1,0 +1,50 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "enabled": false,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/path/to/allowed/files"
+      ],
+      "env": {},
+      "description": "Provides filesystem access within allowed directories"
+    },
+    "github": {
+      "enabled": false,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "$GITHUB_TOKEN"
+      },
+      "description": "GitHub MCP server for repository operations"
+    },
+    "postgres": {
+      "enabled": false,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://localhost/mydb"
+      ],
+      "env": {},
+      "description": "PostgreSQL database access"
+    },
+    "market-analyst": {
+      "type": "stdio",
+      "enabled": true,
+      "description": "市场分析引擎：板块强弱、个股诊断、恐慌评分、异常检测",
+      "command": "$MARKET_ANALYST_PYTHON",
+      "args": ["-m", "market_analyst.mcp_server"],
+      "env": {}
+    }
+  },
+  "skills": {}
+}

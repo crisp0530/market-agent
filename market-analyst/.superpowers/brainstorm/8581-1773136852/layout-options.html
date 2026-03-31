@@ -1,0 +1,180 @@
+<h2>Dashboard 布局方案</h2>
+<p class="subtitle">现有 Streamlit 9 个 Tab 如何映射到 Next.js</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>顶部 Tab 导航（复刻 Streamlit）</h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Market Analyst Dashboard</div>
+        <div class="mockup-body" style="background:#0a0e17;color:#e0e0f0;padding:0">
+          <div style="display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.1);padding:0 16px;overflow-x:auto">
+            <div style="padding:10px 16px;border-bottom:2px solid #f0b90b;color:#f0b90b;font-size:13px;white-space:nowrap">全局概览</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">恐慌/底部</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">盘前异动</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">异常信号</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">突破/抛物线</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">个股机会</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">板块热力图</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">量化面板</div>
+            <div style="padding:10px 16px;color:#8888aa;font-size:13px;white-space:nowrap">个股详情</div>
+          </div>
+          <div style="padding:20px">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+                <div style="color:#8888aa;font-size:11px;text-transform:uppercase">US 市场温度</div>
+                <div style="color:#00d4aa;font-size:24px;font-weight:700;margin-top:4px">偏强</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+                <div style="color:#8888aa;font-size:11px;text-transform:uppercase">CN 市场温度</div>
+                <div style="color:#f59e0b;font-size:24px;font-weight:700;margin-top:4px">震荡</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+                <div style="color:#8888aa;font-size:11px;text-transform:uppercase">VIX 恐慌指数</div>
+                <div style="color:#00d4aa;font-size:24px;font-weight:700;margin-top:4px">16.2</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+                <div style="color:#8888aa;font-size:11px;text-transform:uppercase">异常信号</div>
+                <div style="color:#ff4757;font-size:24px;font-weight:700;margin-top:4px">3</div>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+              <div style="color:#e0e0f0;font-size:14px;font-weight:600;margin-bottom:12px">强弱排名表</div>
+              <table style="width:100%;font-size:12px;color:#e0e0f0;border-collapse:collapse">
+                <tr style="color:#8888aa;border-bottom:1px solid rgba(255,255,255,0.06)">
+                  <th style="text-align:left;padding:8px">Symbol</th>
+                  <th style="text-align:left;padding:8px">Name</th>
+                  <th style="text-align:right;padding:8px">ROC 5d</th>
+                  <th style="text-align:right;padding:8px">Score</th>
+                  <th style="text-align:center;padding:8px">Tier</th>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
+                  <td style="padding:8px">QQQ</td><td style="padding:8px">纳斯达克100</td>
+                  <td style="text-align:right;padding:8px;color:#00d4aa">+3.2%</td>
+                  <td style="text-align:right;padding:8px">92</td>
+                  <td style="text-align:center;padding:8px"><span style="background:#00d4aa;color:#0a0e17;padding:2px 8px;border-radius:4px;font-size:11px">T1</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
+                  <td style="padding:8px">SPY</td><td style="padding:8px">标普500</td>
+                  <td style="text-align:right;padding:8px;color:#00d4aa">+2.1%</td>
+                  <td style="text-align:right;padding:8px">85</td>
+                  <td style="text-align:center;padding:8px"><span style="background:#00d4aa;color:#0a0e17;padding:2px 8px;border-radius:4px;font-size:11px">T1</span></td>
+                </tr>
+                <tr>
+                  <td style="padding:8px">GLD</td><td style="padding:8px">黄金ETF</td>
+                  <td style="text-align:right;padding:8px;color:#ff4757">-1.5%</td>
+                  <td style="text-align:right;padding:8px">45</td>
+                  <td style="text-align:center;padding:8px"><span style="background:#f59e0b;color:#0a0e17;padding:2px 8px;border-radius:4px;font-size:11px">T3</span></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>优势</h4><ul><li>1:1 复刻 Streamlit 体验</li><li>信息分区清晰</li></ul></div>
+        <div class="cons"><h4>劣势</h4><ul><li>9 个 Tab 在手机上不好用</li><li>需要点来点去</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>侧边栏导航 + 路由页面</h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Market Analyst Dashboard</div>
+        <div class="mockup-body" style="background:#0a0e17;color:#e0e0f0;padding:0;display:flex;min-height:300px">
+          <div style="width:200px;background:rgba(255,255,255,0.02);border-right:1px solid rgba(255,255,255,0.06);padding:16px 0;flex-shrink:0">
+            <div style="padding:12px 20px;color:#f0b90b;font-weight:700;font-size:14px;margin-bottom:8px">📊 MA</div>
+            <div style="padding:8px 20px;color:#f0b90b;background:rgba(240,185,11,0.1);border-left:2px solid #f0b90b;font-size:13px">全局概览</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">恐慌/底部</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">盘前异动</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">异常信号</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">突破/抛物线</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">个股机会</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">板块热力图</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">量化面板</div>
+            <div style="padding:8px 20px;color:#8888aa;font-size:13px">个股详情</div>
+          </div>
+          <div style="flex:1;padding:20px">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+                <div style="color:#8888aa;font-size:11px">US 温度</div>
+                <div style="color:#00d4aa;font-size:22px;font-weight:700">偏强</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+                <div style="color:#8888aa;font-size:11px">VIX</div>
+                <div style="color:#00d4aa;font-size:22px;font-weight:700">16.2</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:16px">
+                <div style="color:#8888aa;font-size:11px">异常</div>
+                <div style="color:#ff4757;font-size:22px;font-weight:700">3</div>
+              </div>
+            </div>
+            <div style="color:#e0e0f0;font-size:13px">强弱排名表、图表等内容区...</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>优势</h4><ul><li>Next.js 路由天然适配</li><li>导航常驻，切换快</li><li>桌面体验专业</li></ul></div>
+        <div class="cons"><h4>劣势</h4><ul><li>手机端侧边栏需折叠</li><li>开发量稍大</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>单页长滚动（所有模块上下排列）</h3>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Market Analyst Dashboard</div>
+        <div class="mockup-body" style="background:#0a0e17;color:#e0e0f0;padding:20px;max-height:350px;overflow-y:auto">
+          <div style="text-align:center;margin-bottom:24px">
+            <div style="color:#f0b90b;font-size:20px;font-weight:700">Market Analyst</div>
+            <div style="color:#8888aa;font-size:12px">2026-03-10 更新</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px">
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center">
+              <div style="color:#8888aa;font-size:10px">US</div>
+              <div style="color:#00d4aa;font-size:18px;font-weight:700">偏强</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center">
+              <div style="color:#8888aa;font-size:10px">CN</div>
+              <div style="color:#f59e0b;font-size:18px;font-weight:700">震荡</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center">
+              <div style="color:#8888aa;font-size:10px">VIX</div>
+              <div style="color:#00d4aa;font-size:18px;font-weight:700">16.2</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center">
+              <div style="color:#8888aa;font-size:10px">异常</div>
+              <div style="color:#ff4757;font-size:18px;font-weight:700">3</div>
+            </div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;margin-bottom:20px">
+            <div style="color:#f0b90b;font-size:14px;font-weight:600;margin-bottom:8px">📊 强弱排名</div>
+            <div style="color:#8888aa;font-size:12px">[排名表格]</div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;margin-bottom:20px">
+            <div style="color:#ff4757;font-size:14px;font-weight:600;margin-bottom:8px">⚠️ 异常信号</div>
+            <div style="color:#8888aa;font-size:12px">[异常卡片列表]</div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;margin-bottom:20px">
+            <div style="color:#a855f7;font-size:14px;font-weight:600;margin-bottom:8px">😱 恐慌/底部</div>
+            <div style="color:#8888aa;font-size:12px">[恐慌分数仪表盘]</div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:16px">
+            <div style="color:#06b6d4;font-size:14px;font-weight:600;margin-bottom:8px">📈 突破信号</div>
+            <div style="color:#8888aa;font-size:12px">[信号列表]</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>优势</h4><ul><li>最简单，开发最快</li><li>手机友好，直接滚</li><li>一眼看全貌</li></ul></div>
+        <div class="cons"><h4>劣势</h4><ul><li>内容多时页面很长</li><li>找特定模块要滚动</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

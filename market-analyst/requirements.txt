@@ -1,0 +1,29 @@
+# Requires Python >= 3.10
+
+# 数据收集
+yfinance>=0.2.31,<1.0
+akshare>=1.12.0          # A股备用数据源
+
+# AI 分析（三选一或全装）
+google-genai>=1.0.0      # Gemini (推荐，便宜快速)
+anthropic>=0.25.0        # Claude
+openai>=1.0.0            # GPT
+
+# Web 搜索
+tavily-python>=0.5.0     # Tavily (推荐)
+duckduckgo-search>=4.0   # 备用
+
+# 数据处理
+pandas>=2.2.0
+numpy>=1.26.0
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+loguru>=0.7.2
+pyarrow>=14.0
+
+# Dashboard / Visualization
+streamlit>=1.35.0
+plotly>=5.20.0
+
+# TradingView indicators / sector scan
+tvscreener>=0.1.0
