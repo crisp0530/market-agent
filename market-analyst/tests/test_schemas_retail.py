@@ -3,6 +3,8 @@ import pytest
 from pydantic import ValidationError
 
 from market_analyst.schemas_retail import (
+    CapitalFlowSignal,
+    ActionSignal,
     StockCharacterization,
     TradeSignal,
     QuarterlyMetric,
@@ -11,6 +13,55 @@ from market_analyst.schemas_retail import (
     StrategyItem,
     TradingStrategies,
 )
+
+
+class TestCapitalFlowSignal:
+    def test_valid_construction(self):
+        cf = CapitalFlowSignal(
+            signal="大幅流入", cmf_score=65.0, mfi_score=75.0,
+            relative_volume=1.8, description="资金大幅流入，主力积极介入", dual_source=True,
+        )
+        assert cf.signal == "大幅流入"
+        assert cf.dual_source is True
+
+    def test_defaults(self):
+        cf = CapitalFlowSignal(signal="中性", description="资金流向不明确")
+        assert cf.cmf_score is None
+        assert cf.mfi_score is None
+        assert cf.relative_volume is None
+        assert cf.dual_source is False
+
+    def test_invalid_signal_rejected(self):
+        with pytest.raises(ValidationError):
+            CapitalFlowSignal(signal="超大流入", description="test")
+
+    def test_all_signal_levels(self):
+        for level in ["大幅流入", "小幅流入", "中性", "流出", "大幅流出"]:
+            cf = CapitalFlowSignal(signal=level, description="test")
+            assert cf.signal == level
+
+
+class TestActionSignal:
+    def test_conservative(self):
+        a = ActionSignal(level="conservative", advice="暂时观望，关注变化")
+        assert a.resonance_count == 0
+        assert a.resonance_details == []
+        assert a.support_price is None
+
+    def test_resonance(self):
+        a = ActionSignal(
+            level="resonance", advice="多重信号共振",
+            resonance_count=3,
+            resonance_details=["RSI超卖", "资金流入", "MACD多头"],
+            support_price=8.52, stop_loss_price=8.10,
+        )
+        assert a.level == "resonance"
+        assert a.resonance_count == 3
+        assert len(a.resonance_details) == 3
+
+    def test_invalid_level_rejected(self):
+        with pytest.raises(ValidationError):
+            ActionSignal(level="aggressive", advice="test")
 
 
 class TestStockCharacterization:
@@ -60,6 +111,27 @@ class TestStockCharacterization:
             available_dimensions=["turnover", "volatility"], key_evidence=[], analysis_tips="",
         )
         assert sc.stale is False
+
+    def test_capital_flow_and_action_default_none(self):
+        sc = StockCharacterization(
+            symbol="AAPL", name="Apple", market="us",
+            character_type="机构票", hot_money_score=20, institutional_score=75,
+            available_dimensions=[], key_evidence=[], analysis_tips="",
+        )
+        assert sc.capital_flow is None
+        assert sc.action is None
+
+    def test_with_capital_flow_and_action(self):
+        cf = CapitalFlowSignal(signal="小幅流入", description="资金小幅流入", dual_source=True)
+        action = ActionSignal(level="conservative", advice="暂时观望")
+        sc = StockCharacterization(
+            symbol="600519", name="贵州茅台", market="cn",
+            character_type="机构票", hot_money_score=25, institutional_score=80,
+            available_dimensions=["turnover"], key_evidence=[], analysis_tips="",
+            capital_flow=cf, action=action,
+        )
+        assert sc.capital_flow.signal == "小幅流入"
+        assert sc.action.level == "conservative"
 
 
 class TestTradeSignal:

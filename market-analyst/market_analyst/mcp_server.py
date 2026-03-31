@@ -736,7 +736,7 @@ def _fetch_institutional_pct(symbol: str, market: str) -> float | None:
 
 @mcp.tool()
 def characterize_stock(symbol: str, market: Optional[str] = None) -> str:
-    """个股定性：判断是游资票、机构票、机游合力票还是普通票。
+    """个股定性：判断是游资票、机构票、机游合力票还是普通票，含资金流检测和操作建议。
 
     Args:
         symbol: 股票代码，如 "AAPL", "600519"
@@ -750,6 +750,9 @@ def characterize_stock(symbol: str, market: Optional[str] = None) -> str:
 
         from market_analyst.collectors.stock_collector import StockCollector
         from market_analyst.processors.stock_characterizer import StockCharacterizer
+        from market_analyst.processors.stock_diagnostor import StockDiagnostor
+        from market_analyst.processors.capital_flow_detector import CapitalFlowDetector
+        from market_analyst.processors.action_signal_generator import ActionSignalGenerator
         from market_analyst.utils.cache import DataCache
 
         config = _load_config()
@@ -769,6 +772,44 @@ def characterize_stock(symbol: str, market: Optional[str] = None) -> str:
             symbol=symbol, raw_df=stock_df, market=market,
             market_cap=market_cap, institutional_pct=inst_pct,
         )
+
+        # Enhanced: capital flow detection + action signal
+        tv_data = None
+        tv_cfg = config.get("tvscreener", {})
+        if tv_cfg.get("enabled", True):
+            try:
+                from market_analyst.providers.tvscreener_provider import TvScreenerProvider
+                scripts_dir = tv_cfg.get("scripts_dir", str(BASE_DIR / "scripts" / "tvscreener"))
+                timeout = tv_cfg.get("timeout_seconds", 15)
+                tv_data = TvScreenerProvider(scripts_dir, timeout).fetch(symbol, market)
+            except Exception as e:
+                logger.debug(f"tvscreener fetch failed for {symbol}: {e}")
+
+        diag = StockDiagnostor().diagnose(stock_df)
+        cmf_score = diag.get("flow") if diag else None
+        diag_scores = diag or {}
+        rating = diag.get("rating", 3) if diag else 3
+
+        capital_flow = CapitalFlowDetector(config).detect(
+            cmf_score=cmf_score,
+            mfi_score=tv_data.mfi_14 if tv_data else None,
+            relative_volume=tv_data.relative_volume if tv_data else None,
+        )
+
+        import numpy as np
+        closes = stock_df["close"].values.astype(float) if not stock_df.empty and "close" in stock_df.columns else None
+
+        action = ActionSignalGenerator(config).generate(
+            rating=rating,
+            capital_flow=capital_flow,
+            diag_scores=diag_scores,
+            tv_data=tv_data,
+            closes=closes,
+        )
+
+        result.capital_flow = capital_flow
+        result.action = action
+
         return result.model_dump_json()
     except Exception as e:
         logger.error(f"characterize_stock error: {e}")

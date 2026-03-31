@@ -121,6 +121,8 @@ class ReportResult(BaseModel):
 
 # Retail investor schemas
 from market_analyst.schemas_retail import (  # noqa: F401
+    CapitalFlowSignal,
+    ActionSignal,
     StockCharacterization,
     TradeSignal,
     QuarterlyMetric,

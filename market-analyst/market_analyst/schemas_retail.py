@@ -6,6 +6,28 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class CapitalFlowSignal(BaseModel):
+    """资金流入检测结果。"""
+
+    signal: Literal["大幅流入", "小幅流入", "中性", "流出", "大幅流出"]
+    cmf_score: float | None = None
+    mfi_score: float | None = None
+    relative_volume: float | None = None
+    description: str
+    dual_source: bool = False
+
+
+class ActionSignal(BaseModel):
+    """操作建议（分级型）。"""
+
+    level: Literal["conservative", "resonance"]
+    advice: str
+    resonance_count: int = 0
+    resonance_details: list[str] = Field(default_factory=list)
+    support_price: float | None = None
+    stop_loss_price: float | None = None
+
+
 class StockCharacterization(BaseModel):
     """个股定性结果：游资票/机构票/机游合力票/普通票。"""
 
@@ -18,6 +40,8 @@ class StockCharacterization(BaseModel):
     available_dimensions: list[str] = Field(description="实际参与评分的维度")
     key_evidence: list[str] = Field(description="3-5条关键依据")
     analysis_tips: str = Field(description="针对该类型的分析建议")
+    capital_flow: CapitalFlowSignal | None = None
+    action: ActionSignal | None = None
     stale: bool = False
 
 
