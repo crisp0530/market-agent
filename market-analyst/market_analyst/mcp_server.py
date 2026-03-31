@@ -435,6 +435,14 @@ def _diagnose_stock_impl(
     if result is None:
         return ToolError(error="insufficient_data", message=f"Not enough data for {symbol}")
 
+    capital_flow, action = _build_capital_flow_and_action(
+        stock_df=stock_df,
+        symbol=symbol,
+        market=market,
+        config=_load_config(),
+        diag_result=result,
+    )
+
     return StockDiagnosis(
         symbol=symbol,
         name=name,
@@ -442,7 +450,58 @@ def _diagnose_stock_impl(
         scores={k: result[k] for k in ["trend", "momentum", "sentiment", "volatility", "flow"]},
         rating=result["rating"],
         available_dimensions=result["available_dimensions"],
+        capital_flow=capital_flow,
+        action=action,
     )
+
+
+def _fetch_tvscreener_data(config: dict, symbol: str, market: str):
+    """Best-effort TradingView screener fetch for enhanced stock analysis."""
+    tv_cfg = config.get("tvscreener", {})
+    if not tv_cfg.get("enabled", True):
+        return None
+
+    try:
+        from market_analyst.providers.tvscreener_provider import TvScreenerProvider
+
+        scripts_dir = tv_cfg.get("scripts_dir", str(BASE_DIR / "scripts" / "tvscreener"))
+        timeout = tv_cfg.get("timeout_seconds", 15)
+        return TvScreenerProvider(scripts_dir, timeout).fetch(symbol, market)
+    except Exception as e:
+        logger.debug(f"tvscreener fetch failed for {symbol}: {e}")
+        return None
+
+
+def _build_capital_flow_and_action(
+    stock_df: pd.DataFrame,
+    symbol: str,
+    market: str,
+    config: dict,
+    diag_result: dict,
+):
+    """Build enhanced capital flow and action signals for stock analysis tools."""
+    from market_analyst.processors.action_signal_generator import ActionSignalGenerator
+    from market_analyst.processors.capital_flow_detector import CapitalFlowDetector
+
+    tv_data = _fetch_tvscreener_data(config, symbol, market)
+    capital_flow = CapitalFlowDetector(config).detect(
+        cmf_score=diag_result.get("flow"),
+        mfi_score=tv_data.mfi_14 if tv_data else None,
+        relative_volume=tv_data.relative_volume if tv_data else None,
+    )
+
+    closes = None
+    if not stock_df.empty and "close" in stock_df.columns:
+        closes = stock_df["close"].values.astype(float)
+
+    action = ActionSignalGenerator(config).generate(
+        rating=diag_result.get("rating", 3),
+        capital_flow=capital_flow,
+        diag_scores=diag_result,
+        tv_data=tv_data,
+        closes=closes,
+    )
+    return capital_flow, action
 
 
 # ---------------------------------------------------------------------------
@@ -584,7 +643,7 @@ def get_market_commentary(type: str = "closing") -> str:
 
 @mcp.tool()
 def diagnose_stock(symbol: str, market: Optional[str] = None) -> str:
-    """个股/ETF多维度诊断：趋势、动量、情绪、波动、资金流五维评分 + 综合星级。
+    """个股/ETF增强诊断：五维评分 + 综合星级，并附带资金流检测和操作建议。
 
     Args:
         symbol: 股票代码，如 "AAPL", "600519", "SPY"
@@ -773,39 +832,25 @@ def characterize_stock(symbol: str, market: Optional[str] = None) -> str:
             market_cap=market_cap, institutional_pct=inst_pct,
         )
 
-        # Enhanced: capital flow detection + action signal
-        tv_data = None
-        tv_cfg = config.get("tvscreener", {})
-        if tv_cfg.get("enabled", True):
-            try:
-                from market_analyst.providers.tvscreener_provider import TvScreenerProvider
-                scripts_dir = tv_cfg.get("scripts_dir", str(BASE_DIR / "scripts" / "tvscreener"))
-                timeout = tv_cfg.get("timeout_seconds", 15)
-                tv_data = TvScreenerProvider(scripts_dir, timeout).fetch(symbol, market)
-            except Exception as e:
-                logger.debug(f"tvscreener fetch failed for {symbol}: {e}")
-
         diag = StockDiagnostor().diagnose(stock_df)
         cmf_score = diag.get("flow") if diag else None
-        diag_scores = diag or {}
-        rating = diag.get("rating", 3) if diag else 3
-
-        capital_flow = CapitalFlowDetector(config).detect(
-            cmf_score=cmf_score,
-            mfi_score=tv_data.mfi_14 if tv_data else None,
-            relative_volume=tv_data.relative_volume if tv_data else None,
-        )
-
-        import numpy as np
-        closes = stock_df["close"].values.astype(float) if not stock_df.empty and "close" in stock_df.columns else None
-
-        action = ActionSignalGenerator(config).generate(
-            rating=rating,
-            capital_flow=capital_flow,
-            diag_scores=diag_scores,
-            tv_data=tv_data,
-            closes=closes,
-        )
+        if diag:
+            capital_flow, action = _build_capital_flow_and_action(
+                stock_df=stock_df,
+                symbol=symbol,
+                market=market,
+                config=config,
+                diag_result=diag,
+            )
+        else:
+            capital_flow = CapitalFlowDetector(config).detect(cmf_score=cmf_score)
+            action = ActionSignalGenerator(config).generate(
+                rating=3,
+                capital_flow=capital_flow,
+                diag_scores={},
+                tv_data=None,
+                closes=None,
+            )
 
         result.capital_flow = capital_flow
         result.action = action

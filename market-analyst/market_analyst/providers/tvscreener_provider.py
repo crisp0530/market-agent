@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,20 +29,20 @@ class TvScreenerData:
 class TvScreenerProvider:
     """Wraps tvscreener CLI scripts to fetch real-time technical indicators."""
 
-    # tvscreener JSON field name → TvScreenerData field name
-    FIELD_MAP = {
-        "Relative Volume": "relative_volume",
-        "Chaikin Money Flow (20)": "cmf_20",
-        "Money Flow (14)": "mfi_14",
-        "Relative Strength Index (14)": "rsi_14",
-        "MACD Histogram": "macd_hist",
-        "Recommendation Mark": "recommendation",
-        "Price": "price",
-        "Simple Moving Average (20)": "sma_20",
-        "Simple Moving Average (50)": "sma_50",
-        "Simple Moving Average (200)": "sma_200",
-        "Bollinger Upper Band (20)": "bollinger_upper",
-        "Bollinger Lower Band (20)": "bollinger_lower",
+    # tvscreener JSON field names → TvScreenerData field name
+    FIELD_ALIASES = {
+        "relative_volume": ["Relative Volume"],
+        "cmf_20": ["Chaikin Money Flow (20)"],
+        "mfi_14": ["Money Flow (14)"],
+        "rsi_14": ["Relative Strength Index (14)"],
+        "macd_hist": ["MACD Histogram", "MACD Hist"],
+        "recommendation": ["Recommendation Mark", "Analyst Rating"],
+        "price": ["Price"],
+        "sma_20": ["Simple Moving Average (20)"],
+        "sma_50": ["Simple Moving Average (50)"],
+        "sma_200": ["Simple Moving Average (200)"],
+        "bollinger_upper": ["Bollinger Upper Band (20)"],
+        "bollinger_lower": ["Bollinger Lower Band (20)"],
     }
 
     def __init__(self, scripts_dir: str | Path, timeout: int = 15):
@@ -62,7 +63,7 @@ class TvScreenerProvider:
 
         try:
             result = subprocess.run(
-                ["python", str(script), "--symbol", tv_symbol, "--market", tv_market],
+                [sys.executable, str(script), "--symbol", tv_symbol, "--market", tv_market],
                 capture_output=True, text=True, timeout=self.timeout,
             )
             if result.returncode != 0:
@@ -101,16 +102,24 @@ class TvScreenerProvider:
     def _parse(self, data: dict) -> TvScreenerData:
         """Parse tvscreener JSON output to TvScreenerData."""
         kwargs = {}
-        for json_key, field_name in self.FIELD_MAP.items():
-            val = data.get(json_key)
-            if val is not None and val != "":
-                try:
-                    if field_name == "recommendation":
-                        kwargs[field_name] = str(val)
-                    else:
-                        kwargs[field_name] = float(val)
-                except (ValueError, TypeError):
-                    pass
+        for field_name, aliases in self.FIELD_ALIASES.items():
+            val = None
+            for alias in aliases:
+                candidate = data.get(alias)
+                if candidate is not None and candidate != "":
+                    val = candidate
+                    break
+
+            if val is None:
+                continue
+
+            try:
+                if field_name == "recommendation":
+                    kwargs[field_name] = self._normalize_recommendation(val)
+                else:
+                    kwargs[field_name] = float(val)
+            except (ValueError, TypeError):
+                pass
 
         # Convert raw CMF [-0.5, +0.5] to 0-100 score
         if kwargs.get("cmf_20") is not None:
@@ -118,3 +127,21 @@ class TvScreenerProvider:
             kwargs["cmf_20"] = max(0.0, min(100.0, (raw_cmf + 0.5) * 100))
 
         return TvScreenerData(**kwargs)
+
+    @staticmethod
+    def _normalize_recommendation(value) -> str | None:
+        """Normalize TradingView recommendation payloads to text labels."""
+        if isinstance(value, str):
+            text = value.strip()
+            return text or None
+
+        numeric = float(value)
+        if numeric >= 1:
+            return "Strong Buy"
+        if numeric >= 0.5:
+            return "Buy"
+        if numeric <= -1:
+            return "Strong Sell"
+        if numeric <= -0.5:
+            return "Sell"
+        return "Neutral"

@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -121,6 +121,17 @@ class TestParse:
         assert result.price is None
         assert result.recommendation is None
 
+    def test_alias_fields_from_real_query_output(self, provider: TvScreenerProvider):
+        data = {
+            "Price": 246.63,
+            "MACD Hist": -0.31,
+            "Analyst Rating": 1.48,
+        }
+        result = provider._parse(data)
+        assert result.price == 246.63
+        assert result.macd_hist == -0.31
+        assert result.recommendation == "Strong Buy"
+
 
 # ── CMF conversion ───────────────────────────────────────────────────────────
 
@@ -173,6 +184,13 @@ class TestFetch:
         assert result is not None
         assert result.price == 8.5
         assert result.recommendation == "Buy"
+
+    def test_fetch_uses_current_python(self, provider: TvScreenerProvider):
+        stdout = json.dumps({"Symbol": "SHSE:601866", "Price": 8.5})
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=stdout, stderr="")
+            provider.fetch("601866", "cn")
+        assert Path(mock_run.call_args[0][0][0]).name.startswith("python")
 
     def test_fetch_failure_returncode(self, provider: TvScreenerProvider):
         with patch("subprocess.run") as mock_run:

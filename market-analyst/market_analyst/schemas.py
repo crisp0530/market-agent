@@ -6,6 +6,18 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from market_analyst.schemas_retail import (
+    ActionSignal,
+    CapitalFlowSignal,
+    EarningsAnalysis,
+    QuarterlyMetric,
+    RiskFlag,
+    StockCharacterization,
+    StrategyItem,
+    TradeSignal,
+    TradingStrategies,
+)
+
 
 class ToolError(BaseModel):
     """Returned when a tool cannot produce results."""
@@ -53,6 +65,8 @@ class StockDiagnosis(BaseModel):
     scores: dict[str, float | None]
     rating: int = Field(ge=1, le=5)
     available_dimensions: list[str]
+    capital_flow: CapitalFlowSignal | None = None
+    action: ActionSignal | None = None
     stale: bool = False
 
 
@@ -119,15 +133,4 @@ class ReportResult(BaseModel):
     message: str | None = None
 
 
-# Retail investor schemas
-from market_analyst.schemas_retail import (  # noqa: F401
-    CapitalFlowSignal,
-    ActionSignal,
-    StockCharacterization,
-    TradeSignal,
-    QuarterlyMetric,
-    RiskFlag,
-    EarningsAnalysis,
-    StrategyItem,
-    TradingStrategies,
-)
+# Retail investor schemas are imported above for shared typing/export.

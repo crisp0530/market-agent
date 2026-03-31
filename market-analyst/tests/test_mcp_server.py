@@ -19,6 +19,7 @@ from market_analyst.schemas import (
     ReportResult,
     ToolError,
 )
+from market_analyst.schemas_retail import ActionSignal, CapitalFlowSignal
 
 
 class TestGetFearScore:
@@ -264,6 +265,32 @@ class TestDiagnoseStock:
         assert result.symbol == "AAPL"
         assert 1 <= result.rating <= 5
         assert len(result.available_dimensions) >= 4
+
+    def test_diagnose_includes_enhanced_fields(self):
+        from market_analyst.mcp_server import _diagnose_stock_impl
+
+        np.random.seed(42)
+        dates = pd.bdate_range(end="2026-03-27", periods=60)
+        closes = 150.0 + np.cumsum(np.random.randn(60) * 1.5)
+        df = pd.DataFrame({
+            "symbol": "RKLB", "name": "Rocket Lab", "market": "us",
+            "sector": "Aerospace", "date": dates.strftime("%Y-%m-%d"),
+            "open": closes, "high": closes + 1, "low": closes - 1,
+            "close": closes, "volume": np.full(60, 1e6),
+        })
+
+        fake_flow = CapitalFlowSignal(signal="小幅流入", description="test")
+        fake_action = ActionSignal(level="conservative", advice="观望")
+
+        with patch("market_analyst.mcp_server._build_capital_flow_and_action") as mock_build, \
+                patch("market_analyst.mcp_server._load_config") as mock_load_config:
+            mock_load_config.return_value = {}
+            mock_build.return_value = (fake_flow, fake_action)
+            result = _diagnose_stock_impl(df, "RKLB", "Rocket Lab", "us")
+
+        assert isinstance(result, StockDiagnosis)
+        assert result.capital_flow == fake_flow
+        assert result.action == fake_action
 
     def test_diagnose_no_data(self):
         from market_analyst.mcp_server import _diagnose_stock_impl
